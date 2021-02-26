@@ -1,0 +1,134 @@
+---
+title: "PA1_template"
+author: "Fides"
+date: "2/25/2021"
+output: html_document
+---
+
+# 1-Loading and preprocessing the data
+### a) Load the data and packages
+```{r}
+activity <- read.csv(file="~/Desktop/activity.csv", header=TRUE, sep=",", na.strings = "NA")
+
+library("dplyr")
+library("ggplot2")
+library("data.table")
+library("lubridate")
+library("httpuv")
+```
+### b) Pre-process the data
+##Unify date class
+```{r}
+activity$date <- ymd(activity$date)
+```
+##Remove missing values
+```{r}
+activity1 <- na.omit(activity)
+```
+##Create new variables 
+```{r}
+activity$monthly <- as.numeric(format(activity$date, "%m"))
+activity$daily <- as.numeric(format(activity$date, "%d"))
+```
+##Check data
+```{r}
+summary(activity1)
+```
+## 2-Calculate total number of steps
+### a) Make summary of data for ggplot
+```{r}
+activity2 <- summarize(group_by(activity1, date), daily.step=sum(steps))
+mean.activity <- as.integer(mean(activity2$daily.step))
+median.activity <- as.integer(median(activity2$daily.step))
+```
+### b) Make a histogram of the total number of steps taken each day
+```{r}
+plot.steps.day <- ggplot(activity2, aes(x=daily.step)) + 
+  geom_histogram(binwidth = 1000, aes(y=..count.., fill=..count..)) + 
+  geom_vline(xintercept=mean.activity, colour="orange", linetype="dotted", size=1) +
+  geom_vline(xintercept=median.activity, colour="blue" , linetype="dashed", size=1) +
+  labs(title="Number of Steps taken each day (histogram)", y="Frequency", x="Steps each day") 
+plot.steps.day
+```
+### c) Mean total number of steps taken per day
+```{r}
+mean.activity
+```
+### c) Median total number of steps taken per day
+```{r}
+median.activity
+```
+## 3-What is the average daily activity pattern?
+##Prepare data for ggplot
+```{r}
+activity3 <- activity1 %>% 
+        group_by(interval) %>% 
+        summarize(mean.step=mean(steps))
+```
+### a) Make a time series plot (i.e. \color{red}{\verb|type = "l"|}type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r}
+plot.step.interval <- ggplot(activity3, aes(x=interval,y=mean.step)) + 
+  geom_line(color="blue") + 
+  labs(title="Average Number of Steps Taken - 5-min Interval", y="Average Number of Steps", x="5-min Intervals")
+plot.step.interval
+```
+
+### b) Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+optimal <- which.max(activity3$mean.step)
+optimal.step <- activity3$interval[optimal]
+sprintf("%gth 5-min interval has maximum number of steps", optimal.step)
+```
+## 4-Imputing missing values
+### a) Total number of missing values in dataset
+```{r}
+sum(is.na(activity))
+```
+### b) Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+```{r}
+impute.activity <- activity
+impute.activity$steps[is.na(impute.activity$steps)] <- mean(impute.activity$steps,na.rm=TRUE)
+impute.activity$steps <- as.numeric(impute.activity$steps)
+impute.activity$interval <- as.numeric(impute.activity$interval)
+colSums(is.na(impute.activity))
+```
+### c) Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+summary(impute.activity)
+```
+##Summarize data by date
+```{r}
+impute.activity2 <- summarize(group_by(impute.activity,date),daily.step=sum(steps))
+
+mean.impute   <- as.integer(mean(impute.activity2$daily.step))
+mean.impute
+median.impute <- as.integer(median(impute.activity2$daily.step))
+median.impute
+```
+### d) Plot histogram
+```{r}
+plot.steps.day <- ggplot(impute.activity2, aes(x=daily.step)) + 
+  geom_histogram(binwidth = 1000, aes(y=..count.., fill=..count..)) + 
+  geom_vline(xintercept=mean.impute, colour="orange", linetype="dotted", size=1) +
+  geom_vline(xintercept=median.impute, colour="blue" , linetype="dashed", size=1) +
+  labs(title="Number of Steps taken each day (histogram)", y="Frequency", x="Steps per day")
+plot.steps.day
+```
+
+## 5-Are there differences in activity patterns between weekdays and weekends?
+### a) Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+impute.activity$day <- ifelse(weekdays(impute.activity$date) %in% c("Saturday","Sunday"), "weekday", "weekend")
+```
+##Preparing data for ggplot
+```{r}
+impute.df <- impute.activity %>% group_by(interval,day) %>% summarise(mean.step=mean(steps))
+```
+### b)Plot Average steps across weekday/weekend vs 5-min interval Time Series
+```{r}
+plot.weekday.interval <- ggplot(impute.df, aes(x=interval, y=mean.step, color=day)) + 
+  facet_grid(day~.) +
+  geom_line() + 
+  labs(title="Average Number of Steps Taken vs 5-min Interval on Weekday/Weekend", y="Average Number of Steps", x="5-min Interval Times Series")
+plot.weekday.interval
+```
